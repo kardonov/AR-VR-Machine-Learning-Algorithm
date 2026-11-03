@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ML Lab AR/VR</title>
+<script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+<style>
+:root{--bg:#0b1020;--card:rgba(13,19,41,.94);--ac:#5eead4;--ac2:#fbbf24;--tx:#e8ecf8;--mut:#9aa6c7;--bad:#fb7185;--ok:#4ade80;--line:#263259}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--tx)}
+#cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;display:none;z-index:0}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:10;font-size:14px;line-height:1.45}
+#hud button{font:inherit;cursor:pointer}
+#top{pointer-events:auto;position:absolute;left:10px;right:10px;top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:calc(100% - 130px)}
+.brand{font-weight:700;background:var(--card);border:1px solid var(--line);padding:6px 10px;border-radius:10px}
+.brand span{color:var(--ac)}
+#timer{background:var(--card);border:1px solid var(--line);padding:6px 10px;border-radius:10px;font-variant-numeric:tabular-nums}
+.bar{flex:1;min-width:80px;height:8px;background:#1b2447;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ac),var(--ac2));transition:width .4s}
+.ghost{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+.ghost.on{border-color:var(--ac);color:var(--ac)}
+#chips{pointer-events:none;position:absolute;left:10px;top:54px;display:flex;gap:6px;flex-wrap:wrap;max-width:calc(100% - 130px)}
+.chip,.cnt{font-size:12px;padding:3px 8px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--mut)}
+.chip.on{color:#052e2b;background:var(--ac);border-color:var(--ac)}
+.cnt{color:var(--tx)}
+#panel{pointer-events:auto;position:absolute;left:10px;bottom:10px;width:min(450px,calc(100vw - 20px));max-height:56vh;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;backdrop-filter:blur(6px)}
+#panel.min #body,#panel.min #stat,#panel.min #fb,#panel.min #ai{display:none}
+#hdr{font-weight:700;display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:6px}
+.lv{font-size:11px;font-weight:600;color:#052e2b;background:var(--ac2);padding:2px 7px;border-radius:999px;white-space:nowrap}
+#body p{margin:.3em 0}
+.mut{color:var(--mut)}
+.legend{font-size:12px;color:var(--mut);margin:6px 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 4px 0 0;vertical-align:middle}
+#stat{font-size:13px;background:#0a1030;border:1px solid var(--line);border-radius:8px;padding:6px 9px;margin:6px 0;font-variant-numeric:tabular-nums}
+#stat:empty{display:none}
+#controls{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+#controls button,.btn{background:#1a2550;color:var(--tx);border:1px solid #33427f;border-radius:9px;padding:8px 11px}
+#controls button:hover{background:#243263}
+#controls button.primary,.btn.primary{background:var(--ac);color:#04302b;border-color:var(--ac);font-weight:700}
+#controls button:disabled{opacity:.4;cursor:not-allowed}
+#fb{border-radius:8px;padding:7px 10px;margin-top:6px}
+#fb.ok{background:rgba(74,222,128,.13);border:1px solid var(--ok)}
+#fb.bad{background:rgba(251,113,133,.13);border:1px solid var(--bad)}
+#fb.info{background:#121b3d;border:1px solid var(--line)}
+.hidden{display:none!important}
+#ai{display:none;border-left:3px solid var(--ac);padding:4px 10px;margin-top:8px;background:#0e1736;border-radius:0 8px 8px 0}
+#ai small{display:block;color:var(--ac);font-weight:600;margin-bottom:2px}
+.modal{pointer-events:auto;position:absolute;inset:0;background:rgba(5,8,20,.86);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto}
+.modal .box{max-width:620px;background:#0f1738;border:1px solid var(--line);border-radius:16px;padding:20px 22px}
+.modal h1{margin:0 0 6px;font-size:22px}
+.modal h2{margin:14px 0 4px;font-size:15px;color:var(--ac)}
+.modal ul{margin:4px 0 4px 18px;padding:0}
+.modal input[type=text],.modal input[type=password]{width:100%;padding:8px;border-radius:8px;border:1px solid #33427f;background:#0a1030;color:var(--tx);margin:4px 0 10px}
+.modal table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}
+.modal td,.modal th{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left}
+#toast{pointer-events:none;position:absolute;left:50%;top:92px;transform:translateX(-50%);background:#1b2447;border:1px solid var(--ac);padding:8px 14px;border-radius:10px;opacity:0;transition:opacity .3s;max-width:90vw}
+#toast.show{opacity:1}
+.a-enter-vr,.a-enter-ar{top:54px!important;bottom:auto!important;right:10px!important}
+@media (max-width:560px){#top,#chips{max-width:calc(100% - 20px)}#chips{top:96px}.a-enter-vr,.a-enter-ar{top:96px!important}}
+</style>
+</head>
+<body>
+<video id="cam" autoplay playsinline muted></video>
+
+<a-scene id="scene" background="color: #0b1020" renderer="antialias: true" cursor="rayOrigin: mouse; fuse: false" raycaster="objects: .clickable; far: 40" webxr="optionalFeatures: dom-overlay, hit-test; overlayElement: #hud" vr-mode-ui="enabled: true" ar-mode-ui="enabled: true" device-orientation-permission-ui="enabled: true">
+  <a-entity light="type: ambient; intensity: .75; color: #cfd8ff"></a-entity>
+  <a-entity light="type: directional; intensity: .8; color: #ffffff" position="2 4 3"></a-entity>
+
+  <a-entity id="rig" position="0 0.6 3.4" rotation="-30 0 0">
+    <a-entity id="camEl" camera="fov: 70" look-controls wasd-controls="acceleration: 18" position="0 1.5 0"></a-entity>
+    <a-entity laser-controls="hand: left" raycaster="objects: .clickable; far: 12"></a-entity>
+    <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 12"></a-entity>
+  </a-entity>
+
+  <a-entity id="world">
+    <a-plane id="floor" class="clickable" rotation="-90 0 0" width="3.2" height="3.2" material="color: #10183a; opacity: .85; transparent: true; side: double"></a-plane>
+    <a-entity gridfloor></a-entity>
+    <a-entity id="board" position="0 2.85 0"></a-entity>
+    <a-entity id="p3" visible="false" position="-2.9 1.3 0.3" rotation="0 28 0"></a-entity>
+  </a-entity>
+
+  <div id="hud">
+    <div id="top">
+      <div class="brand">ML Lab <span>AR/VR</span></div>
+      <div id="timer" title="Target 15–20 menit">00:00</div>
+      <div class="bar" title="Progres latihan"><i id="prog"></i></div>
+      <button class="ghost" id="bL" title="Putar dunia 3D ke kiri">&#8634;</button>
+      <button class="ghost" id="bR" title="Putar dunia 3D ke kanan">&#8635;</button>
+      <button class="ghost" id="bCam" title="AR ringan memakai kamera">Kamera</button>
+      <button class="ghost" id="bAI" title="Pengaturan AI">AI</button>
+    </div>
+    <div id="chips"></div>
+    <div id="panel">
+      <div id="hdr"></div>
+      <div id="body"></div>
+      <div id="stat"></div>
+      <div id="controls"></div>
+      <div id="fb" class="hidden"></div>
+      <div id="ai"></div>
+    </div>
+    <div id="toast"></div>
+
+    <div id="intro" class="modal">
+      <div class="box">
+        <h1>ML Lab <span style="color:var(--ac)">AR/VR</span></h1>
+        <div class="mut">Belajar Machine Learning dengan memanipulasi model di ruang 3D</div>
+        <h2>Masalah yang diselesaikan</h2>
+        Banyak mahasiswa hafal rumus k-NN, gradient descent, dan overfitting, tetapi sulit membayangkan <b>bagaimana hyperparameter (k, learning rate, derajat model) mengubah perilaku model</b>. Di sini Anda melihat dan mengubahnya langsung.
+        <h2>Alur 15–20 menit</h2>
+        <ul>
+          <li><b>3 misi</b>: k-NN, Gradient Descent, Underfitting vs Overfitting.</li>
+          <li>Tiap misi: kartu konsep singkat lalu <b>3 latihan</b> yang dibuat otomatis oleh <b>Generator GenAI</b> (data, skenario, dan tingkat kesulitan berbeda tiap sesi dan menyesuaikan performa Anda).</li>
+          <li>Ringkasan hasil dan checklist kriteria di akhir.</li>
+        </ul>
+        <h2>Cara berinteraksi</h2>
+        <ul>
+          <li><b>Layar</b>: seret mouse/jari untuk melihat sekeliling, WASD untuk bergerak, klik objek 3D atau tombol panel.</li>
+          <li><b>AR</b>: tekan ikon AR di kanan atas (Chrome Android + ARCore). Panel HUD tetap tampil sebagai overlay. Alternatif tanpa WebXR: tombol <b>Kamera</b>.</li>
+          <li><b>VR</b>: tekan ikon VR pada headset; panel kontrol 3D muncul di sebelah kiri, arahkan laser controller lalu tekan trigger.</li>
+        </ul>
+        <p class="mut" style="font-size:12px">Butuh internet (A-Frame dimuat dari CDN). Untuk AR/VR buka lewat HTTPS atau localhost.</p>
+        <button class="btn primary" id="bStart" style="width:100%;padding:12px;font-size:16px">Mulai Belajar</button>
+      </div>
+    </div>
+
+    <div id="settings" class="modal hidden">
+      <div class="box">
+        <h1 style="font-size:18px">Pengaturan AI</h1>
+        <p class="mut">Generator latihan lokal selalu aktif (tanpa kunci). Opsional: hubungkan LLM (Anthropic API) agar penjelasan per jawaban ditulis ulang oleh tutor AI.</p>
+        <label>API key (disimpan hanya di memori halaman ini)</label>
+        <input type="password" id="llmKey" placeholder="sk-ant-..." autocomplete="off">
+        <label>Model</label>
+        <input type="text" id="llmModel" value="claude-sonnet-5-5">
+        <label><input type="checkbox" id="llmOn"> Aktifkan penjelasan LLM</label>
+        <p class="mut" style="font-size:12px">Jangan masukkan kunci di perangkat publik. Untuk produksi, arahkan permintaan lewat server proxy.</p>
+        <button class="btn primary" id="bSave">Simpan</button>
+      </div>
+    </div>
+
+    <div id="summary" class="modal hidden"><div class="box" id="sumBox"></div></div>
+  </div>
+</a-scene>
+
+<script>
+/*PURE-START*/
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function rng(seed){let a=seed>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function gauss(r){let u=0;while(!u)u=r();const v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+
+const THEMES=[
+ {name:'Deteksi Spam',x:'Jumlah tautan',z:'Kata promosi',A:'Spam',B:'Bukan spam'},
+ {name:'Klasifikasi Bunga Iris',x:'Panjang kelopak',z:'Lebar kelopak',A:'Spesies X',B:'Spesies Y'},
+ {name:'Prediksi Churn Pelanggan',x:'Lama berlangganan',z:'Keluhan per bulan',A:'Berhenti',B:'Bertahan'},
+ {name:'Skrining Sederhana',x:'Suhu tubuh',z:'Kadar enzim',A:'Berisiko',B:'Normal'}
+];
+const KS=[1,3,5,7,9,11];
+function knnInfo(pts,q,k){
+ const d=pts.map((p,i)=>({i,d:Math.hypot(p.x-q.x,p.z-q.z)})).sort((a,b)=>a.d-b.d);
+ const nb=d.slice(0,k),v=[0,0];nb.forEach(n=>v[pts[n.i].c]++);
+ return{nb,v,cls:v[1]>v[0]?1:0,r:nb[nb.length-1].d};
+}
+function genKNN(level,seed,kind){
+ let out;
+ for(let at=0;at<150;at++){
+  const r=rng(seed*2654+at*131+9);
+  const th=THEMES[Math.floor(r()*THEMES.length)];
+  const sep=[1.25,.95,.7][level-1],sd=[.3,.38,.46][level-1];
+  const ang=r()*6.283,dx=Math.cos(ang)*sep/2,dz=Math.sin(ang)*sep/2,cx=(r()-.5)*.4,cz=(r()-.5)*.4;
+  const per=9+level*3,pts=[];
+  for(let c=0;c<2;c++)for(let i=0;i<per;i++){const s=c?1:-1;pts.push({c,x:clamp(cx+s*dx+gauss(r)*sd,-1.4,1.4),z:clamp(cz+s*dz+gauss(r)*sd,-1.4,1.4)})}
+  const q={x:clamp(cx+gauss(r)*.35,-1.3,1.3),z:clamp(cz+gauss(r)*.35,-1.3,1.3)};
+  const pr=KS.map(k=>knnInfo(pts,q,k).cls);
+  out={th,pts,q,pr};
+  if(kind==='predict'){const ks=[3,5,7].filter(k=>level<2||pr[KS.indexOf(k)]!==pr[0]);if(!ks.length)continue;out.k=ks[Math.floor(r()*ks.length)];return out}
+  if(kind==='move'){out.k=level>1?5:3;out.target=1-knnInfo(pts,q,out.k).cls;return out}
+  if(kind==='k'){if(!pr.some(c=>c!==pr[0]))continue;out.k=1;out.target=1-pr[0];return out}
+ }
+ if(kind==='predict')out.k=5;
+ if(kind==='move'){out.k=3;out.target=1-knnInfo(out.pts,out.q,3).cls}
+ if(kind==='k'){out.k=1;out.target=1-out.pr[0]}
+ return out;
+}
+
+const LRS=[0.02,0.05,0.1,0.25,0.5,0.9];
+const gdLoss=(p,w)=>p.a*(w[0]-p.c1)**2+p.b*(w[1]-p.c2)**2;
+function gdSim(p,lr,n){let w=[...p.w0];const out=[{w:[...w],L:gdLoss(p,w)}];for(let i=0;i<n;i++){w=[w[0]-lr*2*p.a*(w[0]-p.c1),w[1]-lr*2*p.b*(w[1]-p.c2)];out.push({w:[...w],L:gdLoss(p,w)})}return out}
+function gdCls(p,lr){const f1=1-2*lr*p.a,f2=1-2*lr*p.b,f=Math.max(Math.abs(f1),Math.abs(f2));if(f>=1)return'div';if(Math.min(f1,f2)<0)return'osc';if(f>.85)return'slow';return'fast'}
+function genGD(level,seed,kind){
+ let last;
+ for(let at=0;at<80;at++){
+  const r=rng(seed*6151+at*7919+11);
+  const a=[1.0,1.4,1.8][level-1]+r()*.6,b=.25+r()*[.35,.5,.6][level-1];
+  const c1=(r()-.5)*.6,c2=(r()-.5)*.6;
+  const w0=[c1+(r()<.5?-1:1)*(.9+r()*.4),c2+(r()<.5?-1:1)*(.9+r()*.4)];
+  const p={a,b,c1,c2,w0};
+  const cats=LRS.map(lr=>gdCls(p,lr));
+  last={...p,cats};
+  if(kind==='predict'){
+   const pool=['div','osc','slow','fast'].filter(c=>cats.includes(c));
+   const target=pool[Math.floor(r()*pool.length)];
+   const cand=LRS.filter((lr,i)=>cats[i]===target);
+   return{...p,cats,target,lrFixed:cand[Math.floor(r()*cand.length)]};
+  }
+  if(kind==='choose'){
+   const l10=LRS.map(lr=>gdSim(p,lr,10)[10].L);
+   const T=Math.max(.05,Math.min(...l10)*2);
+   const n=l10.filter(v=>v<=T).length;
+   if((n<1||n>3)&&at<79)continue;
+   return{...p,cats,T,l10};
+  }
+  if(kind==='largest'){
+   const idx=cats.map((c,i)=>c!=='div'?i:-1).filter(i=>i>=0);
+   const best=Math.max(...idx);
+   if(best>=LRS.length-1&&at<79)continue;
+   return{...p,cats,answerLr:LRS[best]};
+  }
+ }
+ return last;
+}
+
+function polyfit(xs,ys,d,lam=1e-6){
+ const n=d+1,A=Array.from({length:n},()=>Array(n).fill(0)),b=Array(n).fill(0);
+ for(let i=0;i<xs.length;i++){
+  const p=[];let v=1;for(let j=0;j<n;j++){p.push(v);v*=xs[i]}
+  for(let j=0;j<n;j++){b[j]+=p[j]*ys[i];for(let k=0;k<n;k++)A[j][k]+=p[j]*p[k]}
+ }
+ for(let j=0;j<n;j++)A[j][j]+=lam;
+ for(let c=0;c<n;c++){
+  let m=c;for(let r=c+1;r<n;r++)if(Math.abs(A[r][c])>Math.abs(A[m][c]))m=r;
+  [A[c],A[m]]=[A[m],A[c]];[b[c],b[m]]=[b[m],b[c]];
+  for(let r=c+1;r<n;r++){const f=A[r][c]/A[c][c];for(let k=c;k<n;k++)A[r][k]-=f*A[c][k];b[r]-=f*b[c]}
+ }
+ const w=Array(n).fill(0);
+ for(let r=n-1;r>=0;r--){let s=b[r];for(let k=r+1;k<n;k++)s-=A[r][k]*w[k];w[r]=s/A[r][r]}
+ return w;
+}
+const polyval=(w,x)=>{let s=0,v=1;for(const c of w){s+=c*v;v*=x}return s};
+function genFit(level,seed,kind){
+ let last;
+ for(let at=0;at<120;at++){
+  const r=rng(seed*3571+at*911+5);
+  const amp=.7+r()*.3,fr=2.2+r()*1.4,ph=r()*6.283;
+  const f=x=>amp*Math.sin(fr*x+ph);
+  const sig=[.1,.15,.2][level-1],n=[12,10,10][level-1];
+  const mk=m=>Array.from({length:m},()=>{const x=r()*2-1;return{x,y:f(x)+gauss(r)*sig}});
+  const train=mk(n),test=mk(30);
+  const fits={};
+  for(let d=1;d<=9;d++){
+   const w=polyfit(train.map(p=>p.x),train.map(p=>p.y),d);
+   const mse=a=>a.reduce((s,p)=>s+(polyval(w,p.x)-p.y)**2,0)/a.length;
+   fits[d]={w,tr:mse(train),te:mse(test)};
+  }
+  let best=1;for(let d=2;d<=9;d++)if(fits[d].te<fits[best].te)best=d;
+  const cat={};
+  for(let d=1;d<=9;d++)cat[d]=(d>best&&fits[d].te>1.6*fits[best].te)?'over':(d<best&&fits[d].tr>2.2*sig*sig)?'under':'ok';
+  const vals=Object.values(cat);
+  last={f,train,test,fits,best,cat,sig};
+  if(best>=3&&best<=7&&vals.includes('under')&&vals.includes('over'))return last;
+ }
+ return last;
+}
+/*PURE-END*/
+
+/* ================= KOMPONEN A-FRAME ================= */
+AFRAME.registerComponent('gridfloor',{
+ schema:{size:{default:3.2},div:{default:16},color:{default:'#2b3a6b'}},
+ init(){const g=new THREE.GridHelper(this.data.size,this.data.div,this.data.color,this.data.color);g.position.y=0.005;this.el.setObject3D('grid',g)}
+});
+AFRAME.registerComponent('surface',{
+ schema:{a:{default:1},b:{default:1},c1:{default:0},c2:{default:0},scale:{default:.12},size:{default:1.6},seg:{default:36}},
+ init(){this.build()},update(){this.build()},
+ build(){
+  const d=this.data;
+  if(this.el.getObject3D('mesh'))this.el.removeObject3D('mesh');
+  const g=new THREE.PlaneGeometry(2*d.size,2*d.size,d.seg,d.seg);g.rotateX(-Math.PI/2);
+  const pos=g.attributes.position,cols=[];const col=new THREE.Color();
+  for(let i=0;i<pos.count;i++){
+   const x=pos.getX(i),z=pos.getZ(i),L=d.a*(x-d.c1)**2+d.b*(z-d.c2)**2;
+   pos.setY(i,Math.min(3,d.scale*L));
+   col.setHSL(.62-Math.min(.55,L/14),.75,.5);cols.push(col.r,col.g,col.b);
+  }
+  g.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));
+  g.computeVertexNormals();
+  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,wireframe:true,transparent:true,opacity:.75}));
+  this.el.setObject3D('mesh',m);
+ }
+});
+
+/* ================= APLIKASI ================= */
+(function(){
+const $=(s,r=document)=>r.querySelector(s);
+const sceneEl=$('#scene'),world=$('#world'),rig=$('#rig');
+const COL={A:'#fb7185',B:'#60a5fa',train:'#2dd4bf',test:'#fbbf24'};
+const f2=v=>Math.abs(v)>=100?v.toExponential(1):v.toFixed(2);
+const f3=v=>Math.abs(v)>=100?v.toExponential(1):v.toFixed(3);
+const strip=h=>h.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+function el(tag,attrs,parent){const e=document.createElement(tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
+function clearG(g){while(g.firstChild)g.removeChild(g.firstChild)}
+function polyline(parent,pts,color,op){const e=el('a-entity',{},parent);const geo=new THREE.BufferGeometry().setFromPoints(pts.map(p=>new THREE.Vector3(p[0],p[1],p[2])));const m=new THREE.Line(geo,new THREE.LineBasicMaterial({color,transparent:(op||1)<1,opacity:op||1}));e.setObject3D('line',m);return e}
+function txt(parent,pos,o,rot){const e=el('a-entity',{position:pos},parent);if(rot)e.setAttribute('rotation',rot);e.setAttribute('text',o);return e}
+
+const MISSIONS=[
+ {id:'knn',title:'Misi 1 · k-Nearest Neighbors',kinds:['predict','move','k'],
+  concept:'k-NN mengklasifikasi data baru dengan "bertanya" ke <b>k tetangga terdekat</b> lalu memilih kelas mayoritas. Setiap bola di lantai adalah data latih (warna = kelas). Oktahedron kuning melayang adalah data baru. <b>k kecil</b> peka terhadap noise (batas keputusan bergerigi); <b>k besar</b> lebih halus tetapi bisa mengabaikan pola lokal.',
+  tip:'Tugas Anda: memprediksi, memindahkan titik, dan menemukan k yang tepat.'},
+ {id:'gd',title:'Misi 2 · Gradient Descent',kinds:['predict','choose','largest'],
+  concept:'Gradient descent memperbarui bobot ke arah negatif gradien: <b>w ← w − α·∇L</b>. Permukaan warna adalah lanskap loss, bola kuning adalah bobot model, cincin hijau adalah minimum. <b>α terlalu kecil</b> membuat turun sangat lambat; <b>α terlalu besar</b> membuat bobot berosilasi atau melompat keluar (divergen).',
+  tip:'Tugas Anda: memprediksi perilaku, memilih α yang efisien, dan menemukan batas α yang masih stabil.'},
+ {id:'fit',title:'Misi 3 · Underfitting vs Overfitting',kinds:['under','over','best'],
+  concept:'Model polinomial <b>derajat rendah</b> terlalu sederhana (<b>underfitting</b>: error latih dan uji sama-sama tinggi). <b>Derajat tinggi</b> menghafal noise (<b>overfitting</b>: error latih sangat kecil tetapi error uji membesar). Titik hijau-toska = data latih, titik kuning = data uji, garis merah muda = model, garis abu-abu = fungsi sebenarnya.',
+  tip:'Tugas Anda: mengatur derajat model dan menilai generalisasinya.'}
+];
+const CH=[['move','Manipulasi objek 3D'],['param','Atur parameter'],['decide','Ambil keputusan'],['run','Jalankan simulasi']];
+
+const S={phase:'intro',m:0,e:0,seed:(Date.now()%9000)+1,level:1,streak:0,bad:0,pts:0,fin:new Set(),res:[[],[],[]],used:new Set(),t0:0,xr:null,rot:0,cam:false,exStart:0,llm:{on:false,key:'',model:'claude-sonnet-5-5'},llmUsed:0,variations:0};
+let cur=null,runH=null;
+const U={hdr:'',body:'',stat:'',btns:[],fb:'',fbc:'info',ai:'',aiSrc:''};
+const G={};['knn','gd','fit'].forEach(k=>{G[k]=el('a-entity',{id:'g-'+k},world)});
+
+/* ---------- UI ---------- */
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('show'),3200)}
+function track(t){S.used.add(t);drawChips()}
+function drawChips(){$('#chips').innerHTML=`<span class="cnt">Interaksi aktif ${S.used.size}/4 (min. 3)</span>`+CH.map(([k,l])=>`<span class="chip ${S.used.has(k)?'on':''}">${l}</span>`).join('')}
+function board(t){const b=$('#board');b.setAttribute('text',{value:t,align:'center',width:5,color:'#e8ecf8'})}
+function draw(){
+ $('#hdr').innerHTML=U.hdr;$('#body').innerHTML=U.body;$('#stat').innerHTML=U.stat;
+ const c=$('#controls');c.innerHTML='';
+ U.btns.forEach(b=>{const x=document.createElement('button');x.textContent=b.label;if(b.cls)x.className=b.cls;if(b.dis)x.disabled=true;x.onclick=()=>act(b.id);c.appendChild(x)});
+ const fb=$('#fb');fb.innerHTML=U.fb;fb.className=U.fb?U.fbc:'hidden';
+ const ai=$('#ai');ai.innerHTML=U.ai?`<small>${U.aiSrc}</small>${U.ai}`:'';ai.style.display=U.ai?'block':'none';
+ draw3();
+}
+function draw3(){
+ const p=$('#p3');p.setAttribute('visible',S.xr==='vr');
+ if(S.xr!=='vr')return;
+ clearG(p);
+ el('a-plane',{width:2,height:3.2,position:'0 0 -.01',material:'color:#0b1020;opacity:.93;transparent:true'},p);
+ txt(p,'0 1.42 0',{value:strip(U.hdr),align:'center',width:3.4,color:'#5eead4',wrapCount:30});
+ txt(p,'0 .72 0',{value:strip(U.body).slice(0,230),align:'center',width:3,color:'#e8ecf8',wrapCount:34});
+ if(U.fb)txt(p,'0 -.1 0',{value:strip(U.fb).slice(0,150),align:'center',width:3,color:'#fbbf24',wrapCount:34});
+ U.btns.slice(0,8).forEach((b,i)=>{
+  const e=el('a-entity',{class:'clickable',geometry:'primitive:plane;width:1.8;height:.22',material:'color:#243263;shader:flat',position:`0 ${-.55-i*.26} 0`},p);
+  e.setAttribute('text',{value:b.label,align:'center',width:2.7,color:'#ffffff',zOffset:.01});
+  e.addEventListener('click',()=>act(b.id));
+  e.addEventListener('mouseenter',()=>e.setAttribute('material','color','#3b4c93'));
+  e.addEventListener('mouseleave',()=>e.setAttribute('material','color','#243263'));
+ });
+}
+function setStat(h){U.stat=h;$('#stat').innerHTML=h}
+function prog(){$('#prog').style.width=(S.fin.size/9*100)+'%'}
+
+/* ---------- Kamera & posisi ---------- */
+function fitCamera(){
+ if(S.xr||S.cam){rig.setAttribute('position','0 0 0');rig.setAttribute('rotation','0 0 0');return}
+ const asp=innerWidth/innerHeight,fit=cur&&cur.mkey==='fit';
+ const z=clamp((fit?2.9:2.0)/(Math.tan(35*Math.PI/180)*asp),3,9);
+ rig.setAttribute('position',`0 ${fit?0:.6} ${z}`);
+ rig.setAttribute('rotation',`${fit?0:-30} 0 0`);
+}
+function placeInFront(s,dist){
+ const cam=sceneEl.camera;if(!cam)return;
+ const p=new THREE.Vector3();cam.getWorldPosition(p);
+ world.setAttribute('scale',`${s} ${s} ${s}`);
+ world.setAttribute('position',`${p.x} ${p.y-.05-1.1*s} ${p.z-dist}`);
+}
+function resetPlacement(){world.setAttribute('scale','1 1 1');world.setAttribute('position','0 0 0')}
+sceneEl.addEventListener('enter-vr',()=>{
+ setTimeout(()=>{
+  const ar=sceneEl.is('ar-mode');S.xr=ar?'ar':'vr';
+  $('#floor').setAttribute('material','opacity',ar?.3:.85);
+  fitCamera();
+  const go=()=>placeInFront(ar?.28:.75,ar?1.0:1.8);
+  setTimeout(go,500);setTimeout(go,1500);
+  draw3();
+ },0);
+});
+sceneEl.addEventListener('exit-vr',()=>{S.xr=null;resetPlacement();$('#floor').setAttribute('material','opacity',.85);fitCamera();draw3()});
+async function toggleCam(){
+ if(S.cam){offCam();return}
+ try{
+  const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+  $('#cam').srcObject=st;$('#cam').style.display='block';S.cam=true;$('#bCam').classList.add('on');
+  sceneEl.setAttribute('background','transparent:true');$('#floor').setAttribute('material','opacity',.3);
+  fitCamera();placeInFront(.45,1.5);toast('AR ringan aktif: gerakkan ponsel untuk melihat sekeliling. Tekan Kamera lagi untuk keluar.');
+ }catch(e){toast('Kamera tidak tersedia atau tidak diizinkan.')}
+}
+function offCam(){
+ const v=$('#cam');if(v.srcObject)v.srcObject.getTracks().forEach(t=>t.stop());v.srcObject=null;v.style.display='none';
+ S.cam=false;$('#bCam').classList.remove('on');sceneEl.setAttribute('background','color:#0b1020;transparent:false');
+ $('#floor').setAttribute('material','opacity',.85);resetPlacement();fitCamera();
+}
+function rotate(d){S.rot+=d;world.setAttribute('rotation',`0 ${S.rot} 0`);track('move')}
+
+/* ---------- Interaksi lantai (klik) ---------- */
+let down=null,dragged=false;
+addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];dragged=false},true);
+addEventListener('pointermove',e=>{if(down&&Math.hypot(e.clientX-down[0],e.clientY-down[1])>6)dragged=true},true);
+addEventListener('pointerup',()=>{down=null},true);
+$('#floor').addEventListener('click',e=>{
+ if(dragged||!cur||cur.mkey!=='knn'||!cur.floorMove||cur.done||S.phase!=='exercise')return;
+ const pt=e.detail&&e.detail.intersection&&e.detail.intersection.point;if(!pt)return;
+ const l=world.object3D.worldToLocal(pt.clone());
+ cur.q={x:clamp(l.x,-1.4,1.4),z:clamp(l.z,-1.4,1.4)};track('move');refresh();
+});
+
+/* ---------- Pembuatan latihan (Generator GenAI lokal) ---------- */
+function makeExercise(){
+ const M=MISSIONS[S.m],kind=M.kinds[S.e];S.seed+=1;let c;
+ if(M.id==='knn'){c=genKNN(S.level,S.seed,kind);c.single=kind==='predict';c.floorMove=kind==='move';c.reveal=kind!=='predict'}
+ else if(M.id==='gd'){c=genGD(S.level,S.seed,kind);c.single=kind==='predict';c.lrIdx=1;c.w=[...c.w0];c.n=0;c.trail=[];c.div=false}
+ else{c=genFit(S.level,S.seed,kind);c.single=false;c.deg=1}
+ c.mkey=M.id;c.kind=kind;c.tries=0;c.done=false;c.practice=false;c.seed=S.seed;
+ return c;
+}
+function setGroupVisible(){['knn','gd','fit'].forEach(k=>{if(!cur||cur.mkey!==k)clearG(G[k])});$('#floor').setAttribute('visible',!!cur&&cur.mkey!=='fit')}
+
+/* ---------- Render 3D ---------- */
+const cn=c=>cur.th[c?'B':'A'];
+function render3D(){
+ setGroupVisible();
+ if(cur.mkey==='knn')renderKNN();else if(cur.mkey==='gd')renderGD();else renderFit();
+}
+function renderKNN(){
+ const g=G.knn;clearG(g);const c=cur,th=c.th,info=knnInfo(c.pts,c.q,c.k);
+ const nb=new Set(c.reveal?info.nb.map(n=>n.i):[]);
+ c.pts.forEach((p,i)=>{const col=p.c?COL.B:COL.A,big=nb.has(i);
+  el('a-sphere',{position:`${p.x} ${big?.1:.07} ${p.z}`,radius:big?.1:.065,material:`color:${col};emissive:${col};emissiveIntensity:${big?.8:.15}`},g)});
+ const qy=.42;
+ el('a-octahedron',{position:`${c.q.x} ${qy} ${c.q.z}`,radius:.12,material:'color:#fbbf24;emissive:#fbbf24;emissiveIntensity:.6',animation:'property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear'},g);
+ el('a-entity',{line:`start:${c.q.x} ${qy} ${c.q.z}; end:${c.q.x} 0.01 ${c.q.z}; color:#fbbf24; opacity:.6`},g);
+ el('a-ring',{position:`${c.q.x} 0.012 ${c.q.z}`,rotation:'-90 0 0','radius-inner':.1,'radius-outer':.13,material:'color:#fbbf24;side:double'},g);
+ if(c.reveal){
+  info.nb.forEach(n=>{const p=c.pts[n.i];el('a-entity',{line:`start:${c.q.x} ${qy} ${c.q.z}; end:${p.x} .1 ${p.z}; color:#fde68a; opacity:.85`},g)});
+  el('a-ring',{position:`${c.q.x} 0.02 ${c.q.z}`,rotation:'-90 0 0','radius-inner':Math.max(.01,info.r-.012),'radius-outer':info.r+.012,material:'color:#fde68a;opacity:.7;transparent:true;side:double'},g);
+ }
+ txt(g,'0 .01 1.68',{value:th.x+'  →',align:'center',width:3.2,color:'#9aa6c7'},'-90 0 0');
+ txt(g,'-1.05 .01 -1.68',{value:'↓ '+th.z,align:'center',width:3.2,color:'#9aa6c7'},'-90 0 0');
+ board(MISSIONS[0].title+'  ·  '+th.name);
+}
+function renderGD(){
+ const c=cur,g=G.gd;
+ if(!c.built){
+  clearG(g);
+  el('a-entity',{surface:`a:${c.a};b:${c.b};c1:${c.c1};c2:${c.c2};scale:.12`},g);
+  el('a-ring',{position:`${c.c1} .02 ${c.c2}`,rotation:'-90 0 0','radius-inner':.07,'radius-outer':.11,material:'color:#4ade80;side:double'},g);
+  txt(g,`${c.c1} .3 ${c.c2}`,{value:'minimum',align:'center',width:1.6,color:'#4ade80'});
+  c.trailG=el('a-entity',{},g);
+  c.ball=el('a-sphere',{radius:.07,material:'color:#fbbf24;emissive:#fbbf24;emissiveIntensity:.5'},g);
+  c.built=true;
+ }
+ updateGD();board(MISSIONS[1].title+'  ·  lanskap loss 3D');
+}
+function updateGD(){
+ const c=cur,w=c.w,L=gdLoss(c,w);
+ const x=clamp(w[0],-3.4,3.4),z=clamp(w[1],-3.4,3.4),y=Math.min(3,.12*L)+.05;
+ c.ball.setAttribute('position',`${x} ${y} ${z}`);
+ c.ball.setAttribute('material','color',c.div?'#ef4444':'#fbbf24');
+ while(c.trailG.children.length<c.n){const t=c.trail[c.trailG.children.length];if(!t)break;el('a-sphere',{position:`${t[0]} ${t[1]} ${t[2]}`,radius:.035,material:'color:#fde68a;opacity:.8;transparent:true'},c.trailG)}
+}
+function renderFit(){
+ const g=G.fit;clearG(g);const c=cur,X=x=>x*1.3,Y=y=>1.1+y*.85,F=c.fits[c.deg];
+ el('a-plane',{position:'0 1.1 -.02',width:3.0,height:2.3,material:'color:#0f1630;opacity:.92;transparent:true'},g);
+ polyline(g,[[-1.45,1.1,0],[1.45,1.1,0]],'#33406e');
+ const tf=[];for(let i=0;i<=60;i++){const x=-1+2*i/60;tf.push([X(x),Y(clamp(c.f(x),-1.3,1.3)),.005])}
+ polyline(g,tf,'#7b8bb5',.8);
+ c.train.forEach(p=>el('a-sphere',{position:`${X(p.x)} ${Y(clamp(p.y,-1.3,1.3))} .03`,radius:.045,material:`color:${COL.train};emissive:${COL.train};emissiveIntensity:.4`},g));
+ c.test.forEach(p=>el('a-sphere',{position:`${X(p.x)} ${Y(clamp(p.y,-1.3,1.3))} .03`,radius:.03,material:`color:${COL.test};opacity:.85;transparent:true`},g));
+ const cv=[];for(let i=0;i<=80;i++){const x=-1+2*i/80;cv.push([X(x),Y(clamp(polyval(F.w,x),-1.35,1.35)),.04])}
+ polyline(g,cv,'#f472b6');
+ const bh=m=>Math.max(.02,Math.min(1.6,Math.sqrt(m)*2));
+ [['latih',F.tr,2.0,COL.train],['uji',F.te,2.5,COL.test]].forEach(([lab,m,x,col])=>{
+  const h=bh(m);el('a-box',{position:`${x} ${h/2} 0`,width:.3,height:h,depth:.3,material:`color:${col}`},g);
+  txt(g,`${x} ${h+.22} 0`,{value:`${lab}\n${f3(m)}`,align:'center',width:2.2,color:'#ffffff'});
+ });
+ txt(g,'2.25 -.2 0',{value:'Error (MSE)',align:'center',width:2.2,color:'#9aa6c7'});
+ txt(g,'0 2.5 0',{value:`Derajat polinomial: ${c.deg}`,align:'center',width:4,color:'#f472b6'});
+ board(MISSIONS[2].title);
+}
+
+/* ---------- Deskripsi tiap latihan ---------- */
+const BN=(id,label,cls)=>({id,label,cls});
+function describe(){
+ const c=cur,done=c.done;let body='',stat='',btns=[];
+ if(c.mkey==='knn'){
+  const th=c.th,info=knnInfo(c.pts,c.q,c.k);
+  if(c.kind==='predict')body=`Skenario <b>${th.name}</b>. Titik kuning belum berlabel. Dengan <b>k = ${c.k}</b>, apa prediksi k-NN? Putuskan dulu; tetangga ditampilkan setelah Anda menjawab.`;
+  if(c.kind==='move')body=`Tetap pada <b>k = ${c.k}</b>. <b>Pindahkan titik kuning</b> (klik lantai atau tombol geser) hingga diprediksi sebagai <b>${cn(c.target)}</b>, lalu tekan Periksa.`;
+  if(c.kind==='k')body=`Posisi titik kuning tetap. Atur <b>k</b> (ganjil) sampai prediksi menjadi <b>${cn(c.target)}</b>, lalu tekan Periksa.`;
+  body+=`<div class="legend"><i style="background:${COL.A}"></i>${th.A} &nbsp; <i style="background:${COL.B}"></i>${th.B} &nbsp; Sumbu: ${th.x} × ${th.z}</div>`;
+  if(c.reveal)stat=`k = ${c.k} · ${th.A}: ${info.v[0]} · ${th.B}: ${info.v[1]} → prediksi <b>${cn(info.cls)}</b>`;
+  if(!done){
+   if(c.kind==='predict')btns=[BN('ansA',`Kelas: ${th.A}`),BN('ansB',`Kelas: ${th.B}`)];
+   if(c.kind==='move')btns=[BN('mx-','Geser X -'),BN('mx+','Geser X +'),BN('mz-','Geser Z -'),BN('mz+','Geser Z +'),BN('check','Periksa','primary')];
+   if(c.kind==='k')btns=[BN('k-','k -'),BN('k+','k +'),BN('check','Periksa','primary')];
+  }
+ }
+ if(c.mkey==='gd'){
+  const lr=curLR();
+  if(c.kind==='predict')body=`Dengan <b>α = ${lr}</b> dari titik awal ini, bagaimana perilaku gradient descent? Putuskan dulu, lalu simulasi dijalankan sebagai bukti.`;
+  if(c.kind==='choose')body=`Pilih <b>learning rate α</b> (tombol α−/α+) agar <b>loss ≤ ${f3(c.T)}</b> dalam <b>10 langkah</b>. Boleh bereksperimen dengan Langkah/Jalankan 10, lalu tekan Periksa.`;
+  if(c.kind==='largest')body=`Dari daftar α [${LRS.join(', ')}], temukan α <b>terbesar yang masih tidak divergen</b>. Bereksperimenlah, lalu tekan Periksa dengan α terpilih.`;
+  stat=statGD();
+  if(!done){
+   if(c.kind==='predict')btns=[BN('a_fast','Konvergen cepat'),BN('a_slow','Konvergen lambat'),BN('a_osc','Berosilasi tapi konvergen'),BN('a_div','Divergen')];
+   else btns=[BN('lr-','α -'),BN('lr+','α +'),BN('step','Langkah ×1'),BN('run10','Jalankan 10'),BN('reset','Reset'),BN('check','Periksa','primary')];
+  }
+ }
+ if(c.mkey==='fit'){
+  const F=c.fits[c.deg];
+  if(c.kind==='under')body='Atur <b>derajat polinomial</b> sampai model mengalami <b>UNDERFITTING</b> (terlalu sederhana: error latih pun masih tinggi). Lalu tekan Periksa.';
+  if(c.kind==='over')body='Atur derajat sampai model mengalami <b>OVERFITTING</b> (kurva mengejar noise: error latih sangat kecil, error uji jauh lebih besar). Lalu tekan Periksa.';
+  if(c.kind==='best')body='Pilih derajat dengan <b>generalisasi terbaik</b> (error uji terendah / mendekati terendah). Ingat: error latih selalu turun saat derajat naik, jadi jangan hanya melihatnya. Lalu tekan Periksa.';
+  stat=`Derajat ${c.deg} · MSE latih <b>${f3(F.tr)}</b> · MSE uji <b>${f3(F.te)}</b>`;
+  if(!done)btns=[BN('d-','Derajat -'),BN('d+','Derajat +'),BN('check','Periksa','primary')];
+ }
+ if(done){const last=S.m===2&&S.e===2;btns=[BN('next',last?'Lihat Hasil':'Lanjut','primary'),BN('var','Latihan variasi lain (AI)')]}
+ else btns.push(BN('var','Variasi baru (AI)'));
+ return{body,stat,btns};
+}
+const curLR=()=>cur.kind==='predict'?cur.lrFixed:LRS[cur.lrIdx];
+function statGD(){
+ const c=cur,lr=curLR(),L=gdLoss(c,c.w);
+ return `α = ${lr} · langkah ${c.n} · loss = <b>${f2(L)}</b>${c.div?' · <b style="color:#fb7185">DIVERGEN: bobot melompat keluar lanskap</b>':''}`;
+}
+function refresh(){
+ if(!cur)return;render3D();
+ const M=MISSIONS[S.m],d=describe();
+ U.hdr=`<span>${M.title} · Latihan ${S.e+1}/3</span><span class="lv">GenAI level ${S.level}</span>`;
+ U.body=d.body;U.stat=d.stat;U.btns=d.btns;draw();
+}
+
+/* ---------- Penilaian & penjelasan ---------- */
+function resolve(ok,facts,expl,hint,llmCtx){
+ cur.tries++;
+ const last=ok||cur.single||cur.tries>=2;
+ let note='';
+ if(last){cur.done=true;note=score(ok)}
+ U.fbc=ok?'ok':'bad';
+ U.fb=ok?`<b>Tepat!</b> ${facts}${note}`:last?`<b>Belum tepat.</b> ${facts}${note}`:`<b>Belum tepat.</b> ${hint}<br><small>Satu kesempatan lagi sebelum jawaban dibuka.</small>`;
+ U.ai=last?expl:'';U.aiSrc='AI Generatif lokal · penjelasan';
+ refresh();
+ if(last)askLLM(llmCtx,ok,expl);
+}
+function score(ok){
+ const key=S.m+'-'+S.e;
+ if(cur.practice||S.fin.has(key))return '<br><small>(latihan ekstra: tidak dinilai)</small>';
+ S.fin.add(key);
+ const pts=ok?(cur.tries===1?1:.5):0;S.pts+=pts;
+ S.res[S.m].push({e:S.e,kind:cur.kind,pts,tries:cur.tries,sec:Math.round((Date.now()-S.exStart)/1000),level:S.level});
+ prog();
+ const first=ok&&cur.tries===1;
+ if(first){S.streak++;S.bad=0}else{S.bad++;S.streak=0}
+ let msg='';
+ if(S.streak>=2&&S.level<3){S.level++;S.streak=0;msg='Generator menaikkan tingkat kesulitan.'}
+ else if(S.bad>=2&&S.level>1){S.level--;S.bad=0;msg='Generator menurunkan tingkat kesulitan agar lebih terarah.'}
+ return `<br><small>Skor latihan: ${pts}.${msg?' '+msg+' Level GenAI: '+S.level+'.':''}</small>`;
+}
+async function callLLM(prompt){
+ const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':S.llm.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:S.llm.model,max_tokens:400,messages:[{role:'user',content:prompt}]})});
+ const j=await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||r.status);
+ return j.content.map(b=>b.text||'').join('').trim();
+}
+function askLLM(ctx,ok,fallback){
+ if(!S.llm.on||!S.llm.key)return;
+ const snap=cur;S.llmUsed++;
+ U.ai=fallback;U.aiSrc='Tutor LLM sedang menulis…';draw();
+ callLLM(`Kamu tutor Machine Learning untuk mahasiswa Informatika. Konteks latihan: ${ctx}. Jawaban mahasiswa ${ok?'BENAR':'SALAH'}. Jelaskan dalam bahasa Indonesia, maksimal 80 kata, sertakan satu analogi singkat, tanpa markdown.`)
+  .then(t=>{if(cur===snap){U.ai=t.replace(/</g,'&lt;');U.aiSrc='Tutor LLM · penjelasan';draw()}})
+  .catch(e=>{if(cur===snap){U.ai=fallback;U.aiSrc='AI Generatif lokal (LLM gagal: '+String(e.message).slice(0,60)+')';draw()}});
+}
+
+/* ---------- Aksi per misi ---------- */
+function act(id){
+ if(id==='begin'){S.phase='exercise';S.exStart=Date.now();U.fb='';U.ai='';refresh();return}
+ if(id==='next')return next();
+ if(id==='var')return variation();
+ if(id==='dl')return download();
+ if(id==='restart')return restart();
+ if(!cur||S.phase!=='exercise'||cur.done||cur.busy)return;
+ if(cur.mkey==='knn')aKNN(id);else if(cur.mkey==='gd')aGD(id);else aFit(id);
+}
+function aKNN(id){
+ const c=cur,st=.2;
+ if(id==='ansA'||id==='ansB'){
+  track('decide');c.reveal=true;const info=knnInfo(c.pts,c.q,c.k),ans=id==='ansA'?0:1,th=c.th,p1=c.pr[0];
+  const ok=ans===info.cls;
+  resolve(ok,`Pada k=${c.k}: ${th.A} ${info.v[0]}, ${th.B} ${info.v[1]} → prediksi <b>${cn(info.cls)}</b>.`,
+   `k-NN menghitung jarak ke semua titik latih, mengambil ${c.k} terdekat (garis kuning, cincin = radius tetangga ke-${c.k}), lalu memilih kelas mayoritas: ${cn(info.cls)}. ${p1!==info.cls?`Perhatikan: dengan k=1 prediksinya <b>${cn(p1)}</b>. Nilai k mengubah siapa yang ikut voting, sehingga batas keputusan bergeser.`:`Pada kasus ini k=1 pun memberi hasil sama, tetapi pada data yang lebih tumpang-tindih k sering mengubah hasil.`}`,
+   '',`k-NN, skenario ${th.name}, k=${c.k}, suara ${th.A}=${info.v[0]} dan ${th.B}=${info.v[1]}, prediksi ${cn(info.cls)}, jawaban mahasiswa ${cn(ans)}`);
+ }else if(id[0]==='m'){
+  c.q={x:clamp(c.q.x+(id==='mx+'?st:id==='mx-'?-st:0),-1.4,1.4),z:clamp(c.q.z+(id==='mz+'?st:id==='mz-'?-st:0),-1.4,1.4)};track('move');refresh();
+ }else if(id==='k-'||id==='k+'){
+  c.k=KS[clamp(KS.indexOf(c.k)+(id==='k+'?1:-1),0,KS.length-1)];track('param');refresh();
+ }else if(id==='check'){
+  track('decide');const info=knnInfo(c.pts,c.q,c.k),ok=info.cls===c.target,th=c.th;
+  const facts=`k=${c.k}: ${th.A} ${info.v[0]} vs ${th.B} ${info.v[1]} → prediksi <b>${cn(info.cls)}</b> (target ${cn(c.target)}).`;
+  let expl,hint;
+  if(c.kind==='move'){
+   hint=`Dekatkan titik kuning ke gerombolan <b>${cn(c.target)}</b> sampai mayoritas dari ${c.k} tetangga berwarna itu.`;
+   expl=`Prediksi k-NN hanya bergantung pada ${c.k} tetangga terdekat. Memindahkan titik mengubah daftar tetangga; di dekat gerombolan ${cn(c.target)} mayoritas suara berubah menjadi ${cn(c.target)}. Wilayah tempat prediksi berganti kelas disebut batas keputusan.`;
+  }else{
+   hint=`Coba k lain: k kecil mengikuti tetangga terdekat saja, k besar mengikuti mayoritas wilayah yang lebih luas.`;
+   const good=KS.filter((k,i)=>c.pr[i]===c.target);
+   expl=`Dengan k=1 prediksinya ${cn(c.pr[0])}. Karena posisi titik tetap, perubahan prediksi murni akibat k: semakin besar k, semakin banyak titik yang ikut voting. Nilai k yang menghasilkan ${cn(c.target)}: ${good.join(', ')}. Di praktik, k dipilih dengan validasi silang.`;
+  }
+  resolve(ok,facts,expl,hint,`k-NN, mode ${c.kind}, target ${cn(c.target)}, k=${c.k}, prediksi ${cn(info.cls)}`);
+ }
+}
+function resetGD(){const c=cur;stopRun();c.w=[...c.w0];c.n=0;c.trail=[];c.div=false;if(c.trailG)clearG(c.trailG);updateGD();setStat(statGD())}
+function stepOnce(){
+ const c=cur;if(c.div)return;const lr=curLR();
+ c.w=[c.w[0]-lr*2*c.a*(c.w[0]-c.c1),c.w[1]-lr*2*c.b*(c.w[1]-c.c2)];c.n++;
+ const L=gdLoss(c,c.w);
+ if(Math.abs(c.w[0])>3.4||Math.abs(c.w[1])>3.4||L>400)c.div=true;
+ c.trail.push([clamp(c.w[0],-3.4,3.4),Math.min(3,.12*L)+.05,clamp(c.w[1],-3.4,3.4)]);
+ updateGD();setStat(statGD());
+}
+function stopRun(){if(runH){clearInterval(runH);runH=null}if(cur)cur.busy=false}
+function runSteps(n,done){
+ stopRun();let i=0;cur.busy=true;const snap=cur;
+ runH=setInterval(()=>{if(cur!==snap){clearInterval(runH);runH=null;return}stepOnce();i++;if(i>=n||cur.div){stopRun();if(done)done()}},260);
+}
+const CATT={
+ div:'Divergen',osc:'Berosilasi tapi konvergen',slow:'Konvergen lambat',fast:'Konvergen cepat'
+};
+function gdWhy(c,lr){
+ const f1=1-2*lr*c.a,f2=1-2*lr*c.b,cat=gdCls(c,lr);
+ const base=`Pada tiap langkah, galat di sumbu curam dikali (1 − 2αa) = ${f2x(f1)} dan di sumbu landai (1 − 2αb) = ${f2x(f2)}.`;
+ const m={
+  div:`${base} Karena |faktor| ≥ 1 pada sumbu curam, galat justru membesar tiap langkah, sehingga bola melompat makin jauh: divergen. Solusi: kecilkan α.`,
+  osc:`${base} Faktor negatif berarti bobot melewati minimum lalu berbalik arah (zig-zag); karena |faktor| < 1, amplitudonya tetap menyusut sehingga akhirnya konvergen.`,
+  slow:`${base} Faktor di sumbu landai mendekati 1, sehingga galat menyusut sangat pelan. α bisa dinaikkan sedikit.`,
+  fast:`${base} Semua faktor kecil dan positif, jadi galat menyusut mulus dan cepat menuju minimum.`
+ };
+ return m[cat];
+}
+const f2x=v=>v.toFixed(2);
+function aGD(id){
+ const c=cur;
+ if(id==='lr-'||id==='lr+'){c.lrIdx=clamp(c.lrIdx+(id==='lr+'?1:-1),0,LRS.length-1);track('param');resetGD();refresh()}
+ else if(id==='step'){track('run');stepOnce()}
+ else if(id==='run10'){track('run');runSteps(10)}
+ else if(id==='reset'){resetGD()}
+ else if(id.startsWith('a_')){
+  track('decide');const ans=id.slice(2),real=gdCls(c,c.lrFixed),ok=ans===real;
+  resolve(ok,`Untuk α=${c.lrFixed}, perilaku sebenarnya: <b>${CATT[real]}</b>.`,gdWhy(c,c.lrFixed),'',`Gradient descent, α=${c.lrFixed}, perilaku sebenarnya ${CATT[real]}, jawaban mahasiswa ${CATT[ans]}`);
+  resetGD();track('run');runSteps(14);
+ }else if(id==='check'){
+  track('decide');const lr=LRS[c.lrIdx];
+  if(c.kind==='choose'){
+   resetGD();
+   runSteps(10,()=>{
+    const L=gdLoss(c,c.w),ok=!c.div&&L<=c.T;
+    const okLr=LRS.filter((v,i)=>c.l10[i]<=c.T);
+    resolve(ok,`Setelah 10 langkah dengan α=${lr}: loss = <b>${f3(L)}</b> (target ≤ ${f3(c.T)}).`,
+     `${gdWhy(c,lr)} α yang memenuhi target pada latihan ini: ${okLr.join(', ')}. Di praktik, α dipilih lewat eksperimen kecil atau jadwal learning rate.`,
+     `Loss masih ${f3(L)}. Jika kurvanya lambat, naikkan α; jika melompat atau zig-zag lebar, turunkan α.`,
+     `Gradient descent, memilih α agar loss ≤ ${f3(c.T)} dalam 10 langkah; α pilihan ${lr}, loss akhir ${f3(L)}`);
+   });
+  }else{
+   const ok=lr===c.answerLr;
+   resolve(ok,`α pilihan = ${lr}; α terbesar yang masih stabil dari daftar = <b>${c.answerLr}</b>.`,
+    `Stabil berarti |1 − 2αa| < 1 di semua sumbu, atau α < 1/a untuk sumbu terpendam paling curam (a=${f2x(c.a)} → batas α ≈ ${f2x(1/c.a)}). ${gdWhy(c,lr)}`,
+    lr>c.answerLr?'α ini sudah melewati batas stabil: coba jalankan simulasinya, lalu pilih yang lebih kecil.':'Masih ada α lebih besar yang stabil. Uji α di atasnya dengan Jalankan 10.',
+    `Gradient descent, mencari α terbesar yang tidak divergen, jawaban ${lr}, benar ${c.answerLr}`);
+   resetGD();runSteps(12);
+  }
+ }
+}
+function aFit(id){
+ const c=cur;
+ if(id==='d-'||id==='d+'){c.deg=clamp(c.deg+(id==='d+'?1:-1),1,9);track('param');refresh();track('run')}
+ else if(id==='check'){
+  track('decide');const d=c.deg,F=c.fits,cat=c.cat[d];let ok,hint,ex;
+  const exU=Object.keys(c.cat).find(k=>c.cat[k]==='under'),exO=Math.max(...Object.keys(c.cat).filter(k=>c.cat[k]==='over').map(Number));
+  if(c.kind==='under'){ok=cat==='under';hint='Underfitting: kurva terlalu lurus/sederhana sehingga error LATIH pun masih tinggi. Coba derajat lebih rendah.';ex=exU}
+  else if(c.kind==='over'){ok=cat==='over';hint='Overfitting: kurva meliuk mengejar semua titik latih (error latih ≈ 0) tetapi error uji melonjak. Coba derajat lebih tinggi.';ex=exO}
+  else{ok=F[d].te<=1.1*F[c.best].te;hint='Bandingkan error UJI antar derajat, bukan error latih. Cari derajat dengan error uji terendah.';ex=c.best}
+  const desc={under:'terlalu sederhana: tidak menangkap pola, sehingga error latih dan uji sama-sama tinggi (underfitting)',over:`terlalu fleksibel: kurva mengejar noise; error latih (${f3(F[d].tr)}) jauh lebih kecil daripada error uji (${f3(F[d].te)}) (overfitting)`,ok:'cukup seimbang: kurva mengikuti pola tanpa menghafal noise, sehingga error uji rendah'}[cat];
+  resolve(ok,`Derajat ${d}: MSE latih ${f3(F[d].tr)}, MSE uji ${f3(F[d].te)}. Derajat terbaik pada data ini: <b>${c.best}</b> (MSE uji ${f3(F[c.best].te)}).`,
+   `Derajat ${d} ${desc}. Contoh jawaban yang memenuhi tugas ini: derajat ${ex}. Pelajaran utama: error latih selalu turun saat model makin kompleks, sehingga performa model harus dinilai pada data uji atau validasi.`,hint,
+   `Polinomial derajat ${d}, MSE latih ${f3(F[d].tr)}, MSE uji ${f3(F[d].te)}, derajat terbaik ${c.best}, mode ${c.kind}`);
+ }
+}
+
+/* ---------- Alur ---------- */
+function showConcept(){
+ S.phase='concept';stopRun();cur=makeExercise();fitCamera();render3D();
+ const M=MISSIONS[S.m];
+ U.hdr=`<span>${M.title}</span><span class="lv">GenAI level ${S.level}</span>`;
+ U.body=`<p>${M.concept}</p><p class="mut">${M.tip}</p>`;U.stat='';U.fb='';U.ai='';U.btns=[BN('begin','Mulai Latihan','primary')];draw();
+}
+function next(){
+ stopRun();S.e++;
+ if(S.e>=3){S.e=0;S.m++;if(S.m>=3)return summary();return showConcept()}
+ cur=makeExercise();S.exStart=Date.now();U.fb='';U.ai='';fitCamera();refresh();
+}
+function variation(){
+ stopRun();const was=cur&&cur.done;S.variations++;
+ cur=makeExercise();cur.practice=!!was;S.exStart=Date.now();
+ fitCamera();refresh();
+ U.fb=`<small>Generator AI membuat variasi baru (seed #${cur.seed}, level ${S.level}): data, skenario, dan target berbeda.${was?' Mode latihan ekstra.':''}</small>`;U.fbc='info';U.ai='';draw();
+}
+function fmtT(ms){const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+function report(){
+ const ms=Date.now()-S.t0;
+ return{aplikasi:'ML Lab AR/VR',waktu_total:fmtT(ms),skor:S.pts,skor_maks:9,level_akhir:S.level,interaksi_digunakan:[...S.used],variasi_dibuat:S.variations,penjelasan_llm:S.llmUsed,hasil:MISSIONS.map((m,i)=>({misi:m.title,latihan:S.res[i]}))};
+}
+function summary(){
+ S.phase='summary';cur=null;clearG(G.knn);clearG(G.gd);clearG(G.fit);$('#floor').setAttribute('visible',false);
+ const r=report(),ms=Date.now()-S.t0,min=ms/60000;
+ const rows=MISSIONS.map((m,i)=>{const p=S.res[i].reduce((s,x)=>s+x.pts,0);return `<tr><td>${m.title}</td><td>${p} / 3</td></tr>`}).join('');
+ const worst=MISSIONS.map((m,i)=>[S.res[i].reduce((s,x)=>s+x.pts,0),m]).sort((a,b)=>a[0]-b[0])[0][1];
+ const dur=min<15?'lebih cepat dari target (15–20 menit)':min<=20?'sesuai target 15–20 menit':'lebih lama dari target; wajar untuk eksplorasi tambahan';
+ const chk=[
+  ['Teknologi AR/VR (WebXR + 3D web)',true],
+  ['Integrasi GenAI: generator latihan visual otomatis dan adaptif'+(S.llm.on?' + tutor LLM':''),S.variations>=0],
+  ['Minimal 3 titik interaksi aktif ('+S.used.size+' jenis terpakai)',S.used.size>=3],
+  ['Durasi sesi '+fmtT(ms)+' — '+dur,true],
+  ['Aplikasi clickable dan berfungsi',true]
+ ].map(([t,o])=>`<tr><td>${o?'✔':'✖'}</td><td>${t}</td></tr>`).join('');
+ $('#sumBox').innerHTML=`<h1>Hasil Belajar</h1><div class="mut">Skor ${S.pts} / 9 · waktu ${fmtT(ms)} · level akhir GenAI ${S.level}</div>
+  <table>${rows}</table><h2>Checklist kriteria produk</h2><table>${chk}</table>
+  <h2>Saran belajar</h2><div id="sugg">Perdalam <b>${worst}</b>: ulangi latihan dengan variasi baru dan jelaskan, dengan kata sendiri, mengapa hyperparameter pada misi itu mengubah perilaku model.</div>
+  <h2>Pertanyaan refleksi</h2><ul><li>Hyperparameter mana (k, α, derajat) yang paling mengubah hasil, dan bagaimana Anda mengetahuinya?</li><li>Mengapa error latih saja tidak cukup untuk menilai model?</li></ul>
+  <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="sDl">Unduh Laporan (JSON)</button><button class="btn" id="sRe">Ulangi</button></div>`;
+ $('#sDl').onclick=download;$('#sRe').onclick=restart;
+ $('#summary').classList.remove('hidden');board('Selesai!');U.hdr='';U.body='';U.stat='';U.btns=[];U.fb='';U.ai='';draw();
+ if(S.llm.on&&S.llm.key){
+  callLLM(`Kamu tutor Machine Learning. Hasil mahasiswa (JSON): ${JSON.stringify(r.hasil).slice(0,1500)}. Beri 3 saran belajar berikutnya dalam bahasa Indonesia, maksimal 70 kata, tanpa markdown.`)
+   .then(t=>{$('#sugg').textContent=t}).catch(()=>{});
+ }
+}
+function download(){
+ const b=new Blob([JSON.stringify(report(),null,2)],{type:'application/json'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='laporan-ml-lab.json';document.body.appendChild(a);a.click();a.remove();
+}
+function restart(){
+ $('#summary').classList.add('hidden');
+ Object.assign(S,{m:0,e:0,pts:0,streak:0,bad:0,level:1,variations:0,llmUsed:0});S.fin.clear();S.res=[[],[],[]];S.used.clear();S.t0=Date.now();
+ drawChips();prog();showConcept();
+}
+function startSession(){
+ $('#intro').classList.add('hidden');S.t0=Date.now();
+ setInterval(()=>{if(S.phase!=='summary')$('#timer').textContent=fmtT(Date.now()-S.t0)},1000);
+ drawChips();prog();showConcept();
+}
+
+/* ---------- Pengikat ---------- */
+$('#bStart').onclick=startSession;
+$('#bL').onclick=()=>rotate(-25);$('#bR').onclick=()=>rotate(25);
+$('#bCam').onclick=toggleCam;
+$('#bAI').onclick=()=>$('#settings').classList.remove('hidden');
+$('#bSave').onclick=()=>{
+ S.llm.key=$('#llmKey').value.trim();S.llm.model=$('#llmModel').value.trim()||'claude-sonnet-5-5';S.llm.on=$('#llmOn').checked&&!!S.llm.key;
+ $('#settings').classList.add('hidden');toast(S.llm.on?'Tutor LLM aktif.':'Memakai generator AI lokal.');
+};
+$('#hdr').addEventListener('dblclick',()=>$('#panel').classList.toggle('min'));
+addEventListener('resize',fitCamera);
+drawChips();fitCamera();
+})();
+</script>
+</body>
+</html>
